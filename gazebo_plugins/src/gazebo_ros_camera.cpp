@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Clyde hack
+#define WALL_TIME
+
 #include <sdf/Element.hh>
 #include <gazebo/common/Events.hh>
 #include <gazebo/rendering/Distortion.hh>
@@ -319,12 +322,21 @@ void GazeboRosCamera::OnNewFrame(
 {
   // TODO(louise) Enable / disable sensor once SubscriberStatusCallback has been ported to ROS2
 
+#ifdef WALL_TIME
+    auto t = std::chrono::high_resolution_clock::now();
+    rclcpp::Time msg_time{t.time_since_epoch().count(), RCL_ROS_TIME};
+#else
   auto sensor_update_time = this->parentSensor->LastMeasurementTime();
+#endif
 
   // Publish image
   sensor_msgs::msg::Image image_msg;
   image_msg.header.frame_id = impl_->frame_name_;
+#ifdef WALL_TIME
+  image_msg.header.stamp = msg_time;
+#else
   image_msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(sensor_update_time);
+#endif
 
   // Copy from src to image_msg
   sensor_msgs::fillImage(image_msg, impl_->type_, _height, _width,
@@ -334,8 +346,12 @@ void GazeboRosCamera::OnNewFrame(
 
   // Publish camera info
   auto camera_info_msg = impl_->camera_info_manager_->getCameraInfo();
+#ifdef WALL_TIME
+  image_msg.header.stamp = msg_time;
+#else
   camera_info_msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(
     sensor_update_time);
+#endif
 
   impl_->camera_info_pub_->publish(camera_info_msg);
 
@@ -346,6 +362,8 @@ void GazeboRosCamera::OnNewFrame(
     std::lock_guard<std::mutex> lock(impl_->trigger_mutex_);
     impl_->triggered = std::max(impl_->triggered - 1, 0);
   }
+
+  // TODO(clyde) Publish ground truth at the same time (must be a gazebo::ModelPlugin)
 }
 
 void GazeboRosCamera::SetCameraEnabled(const bool _enabled)

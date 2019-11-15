@@ -115,8 +115,14 @@ void GazeboRosP3D::Load(gazebo::physics::ModelPtr model, sdf::ElementPtr sdf)
     return;
   }
 
+#define DEFAULT_QOS
+#ifdef DEFAULT_QOS
+    impl_->pub_ = impl_->ros_node_->create_publisher<nav_msgs::msg::Odometry>(
+      impl_->topic_name_, rclcpp::SystemDefaultsQoS());
+#else
   impl_->pub_ = impl_->ros_node_->create_publisher<nav_msgs::msg::Odometry>(
     impl_->topic_name_, rclcpp::SensorDataQoS());
+#endif
   impl_->topic_name_ = impl_->pub_->get_topic_name();
   RCLCPP_DEBUG(
     impl_->ros_node_->get_logger(), "Publishing on topic [%s]", impl_->topic_name_.c_str());
@@ -204,6 +210,14 @@ void GazeboRosP3DPrivate::OnUpdate(const gazebo::common::UpdateInfo & info)
   // Copy data into pose message
   pose_msg.header.frame_id = frame_name_;
   pose_msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(current_time);
+#define WALL_TIME
+#ifdef WALL_TIME
+  auto t = std::chrono::high_resolution_clock::now();
+  rclcpp::Time msg_time{t.time_since_epoch().count(), RCL_ROS_TIME};
+  pose_msg.header.stamp = msg_time;
+#else
+  pose_msg.header.stamp = gazebo_ros::Convert<builtin_interfaces::msg::Time>(current_time);
+#endif
   pose_msg.child_frame_id = link_->GetName();
 
   // Get inertial rates
