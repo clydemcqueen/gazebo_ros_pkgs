@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Clyde hack
+#define WALL_TIME
+
 #include <sdf/Element.hh>
 #include <gazebo/common/Events.hh>
 #include <gazebo/rendering/Distortion.hh>
@@ -530,6 +533,9 @@ void GazeboRosCamera::NewFrame(
 {
   // TODO(shivesh) Enable / disable sensor once SubscriberStatusCallback has been ported to ROS2
 
+#ifdef WALL_TIME
+  gazebo::common::Time sensor_update_time = gazebo::common::Time::GetWallTime();
+#else
   gazebo::common::Time sensor_update_time;
 
   if (impl_->sensor_type_ == GazeboRosCameraPrivate::CAMERA) {
@@ -539,6 +545,7 @@ void GazeboRosCamera::NewFrame(
   } else {
     sensor_update_time = MultiCameraPlugin::parent_sensor_->LastMeasurementTime();
   }
+#endif
 
   // Publish camera info
   auto camera_info_msg = impl_->camera_info_manager_[_camera_num]->getCameraInfo();
@@ -729,6 +736,8 @@ void GazeboRosCamera::OnNewDepthFrame(
     std::lock_guard<std::mutex> lock(impl_->trigger_mutex_);
     impl_->triggered = std::max(impl_->triggered - 1, 0);
   }
+
+  // TODO(clyde) Publish ground truth at the same time (must be a gazebo::ModelPlugin)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
